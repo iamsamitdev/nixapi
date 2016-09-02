@@ -1,0 +1,213 @@
+Server Side
+-------------------------------------------------------------------------
+1. Create Database "nixdb"
+2. Create Table "photo"
+
+------------
+CREATE TABLE IF NOT EXISTS `photo` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `path` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+);
+------------
+
+3. Creae file api "uploadapi.php"
+
+------------
+<?php
+if(isset($_FILES['photo'])){
+    $mysqli = new mysqli("localhost", "root", "1234", "nixdb");
+    if(mysqli_connect_errno()){
+        echo "Please check your database connection!";
+        exit;
+    }
+ 
+    if(!file_exists("upload")){
+        mkdir("upload", 0777);
+    }
+ 
+    $filename = $_FILES['photo']['name'];
+    $description = $_POST['description'];
+    move_uploaded_file($_FILES['photo']['tmp_name'], 'upload/'.$filename);
+ 
+    $sql = "INSERT INTO photo (`path`, `description`) VALUES (?, ?) ";
+    $statement = $mysqli->prepare($sql);
+    $statement->bind_param("ss", $filename, $description);
+    $statement->execute();
+ 
+    if($statement->affected_rows > 0){
+        echo "Upload photo success";
+    }else{
+        echo "Upload photo failed. " + $statement->errno;
+    }
+ 
+    $statement->close();
+    $mysqli->close();
+}else{
+    echo "No File!";
+}
+?>
+----------
+
+
+Client Side
+--------------------------------------------------------------------------
+1. git clone https://github.com/iamsamitdev/nixapp.git
+2. cordova platform add android --save
+3. cordova plugin add cordova-plugin-camera --save
+4. cordova plugin add cordova-plugin-file-transfer --save
+5. cordova build android
+6. cordova run android
+
+7. เพิ่มพื้นที่แสดงรุปภาพที่หน้า index.html
+
+------
+<div class="upload-bar" id="uploadbar">
+	<div class="cancle-box">
+		<button type="submit" class="button button-fill color-red" id="button-cancle">Cancel</button>
+	</div>
+	<div class="button-upload">
+		<button type="submit" class="button button-fill color-blue">Upload</button>
+	</div>
+</div>
+-----
+
+8. กำหนดตัวแปรไว้บนสุดของไฟล์ index.js
+---
+var imgPath;
+var destinationUrl = "http://localhost/nixapi/uploadapi.php";
+---
+
+9. สร้างฟังก์ชันเรียกใช้งานกล้องถ่ายภาพ
+
+---
+//  Take Photo Camera
+function cameraTakePicture() {
+      navigator.camera.getPicture(onSuccess, onFail, {
+            quality: 80,
+            destinationType: Camera.DestinationType.FILE_URI
+      });
+}
+
+function onSuccess(imageData) {
+      var image = document.getElementById('image-preview');
+
+      document.getElementById("showlogo").style.display = "none";
+      image.src = imageData;
+      document.getElementById("uploadbar").style.display = "block";
+}
+
+function onFail(message) {
+     alert('Failed because: ' + message);
+}
+---
+
+10. เพิ่ม Event เรียกฟังก์ชันถ่ายภาพใน onDeviceReady:
+----
+ // Take picture
+ document.getElementById("cameraTakePicture").addEventListener("click", cameraTakePicture);
+----
+
+11. สร้างฟังก์ชันการกดปุ่มยกเลิกอัพโหลด
+
+--
+// Cancel Upload
+function cancleupload()
+{
+	var image = document.getElementById('image-preview');
+	image.src = "";
+	document.getElementById("uploadbar").style.display = "none";
+	document.getElementById("showlogo").style.display = "block";
+}
+----
+
+12. เพิ่มอีเวนท์การกดปุ่มยกเลิก
+
+---
+// Cancel button
+document.getElementById("button-cancle").addEventListener("click", cancleupload);
+---
+
+13. กำหนด value ให้ตัวแปร imgPath ใน method onSuccess
+----
+imgPath = imgData;
+----
+
+14. สร้างฟังก์ชันอัพโหลดไฟล์
+---
+// Upload photo function
+function uploadPhoto()
+{
+       //set upload file options
+        var options = new FileUploadOptions();
+        options.fileKey = "photo";
+        options.fileName = imgPath;
+        options.mimeType = "image/jpeg";
+
+        //upload file
+        fileTransfer.upload(imgPath, destinationUrl, function(response){
+            //on success
+            alert(response.response);
+        }, function(error){
+            //on failed
+            alert("An error has occured: Code=" + error.code);
+        }, options);
+
+}
+------
+
+15. เพิ่ม Loading ระหว่างรออัพโหลด
+---
+หน้า index.html ใส่ไว้ใน id=home
+
+<div class="loader" id="loading">
+                	<div class="loader-inner" id="loading-inner"></div>
+</div>
+
+-----
+หน้า style.css
+
+.loader{
+    height: 5px;
+    width: 100%;
+}
+ 
+.loader-inner{
+    width: 0%;
+    height: 100%;
+    background: #FF0000;
+}
+
+
+------
+
+16. เพิ่มฟังก์ชันการโหลดดิ้ง
+---
+  //set file transfer
+        var fileTransfer = new FileTransfer();
+        //show loading bar when upload on progress
+        fileTransfer.onprogress = function(progressEvent){
+        	document.getElementById("uploadbar").style.display = "none";
+             document.getElementById("loading").style.display = "block";
+            if(progressEvent.lengthComputable){
+                console.log(progressEvent.loaded + " of " + progressEvent.total);
+                document.getElementById("loading-inner").style.width = progressEvent.loaded / progressEvent.total * 100 + "%";
+            }else{
+                document.getElementById("loading-inner").style.width = "100%";
+            }
+        }
+---
+
+17. ปรับแต่งหลังอัพโหลดไฟล์ให้กลับไปหน้าหลักเริ่มต้น
+---
+alert(response.response);
+            document.getElementById("loading").style.display = "none";
+            var image = document.getElementById('image-preview');
+	image.src = "";
+	document.getElementById("showlogo").style.display = "block";
+----
+
+
+
+
+
